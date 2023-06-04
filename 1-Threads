@@ -1,0 +1,118 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sched.h>
+#include <time.h>
+#include <sys/resource.h>
+
+#define NumThreads 1
+
+int var1;
+int var2;
+
+/*main thread's function*/
+void *update_thread(void *i);
+
+char *progname = "threads";
+
+int main(void) {
+	pthread_t threadID[NumThreads]; /*array of threads id*/
+	pthread_attr_t attrib;          /*struct of thread's attributes*/
+	struct sched_param param;       /*struct of scheduling parameters*/
+	int policy;						/*scheduling policy*/
+	int oldcancel;
+	int i,error;
+
+
+	var1 = var2 = 0;
+
+	printf("%s: starting, creating theads ...\n", progname);
+	/*getting thread's parameters and scheduling policy*/
+	/*_________________________________________________*/
+    if(error!=0){
+        printf("%s: failed to get priority\n", progname);
+    }
+
+    /*initializing structure of thread's attributes*/
+	/*_____________________________________________*/
+    if(error!=0){
+        printf("%s: failed to init attribute \n", progname);
+    }
+    /*independent scheduling policy and priorities of threads */
+	/*_________________________________________________*/
+
+    /*setting a new scheduling policy - round-robin algorithm*/
+	/*_________________________________________________*/
+    if(error!=0){
+        printf("failed to set sched policy\n");
+    }
+
+    param.sched_priority = 20;
+
+    /*set thread's attributes and scheduling policy*/
+	/*_________________________________________________*/
+    if(error!=0){
+        printf("failed to set priority\n");
+    }
+
+	pthread_setcanceltype( PTHREAD_CANCEL_ASYNCHRONOUS, &oldcancel );
+
+
+	for(i = 0; i < NumThreads; i++){
+		/*creating new threads, they start job in update_thread function*/
+		/*_________________________________________________*/
+	}
+
+	/*wait some time, threads do their job */
+	sleep(60);
+
+	printf("%s: stopping, canceling threads ... \n", progname);
+
+	/*canceling threads*/
+	for(i = 0; i < NumThreads; i++){
+		/*_________________________________________________*/
+	}
+
+	printf("%s: all done, var1 = %d, var2 = %d\n", progname, var1, var2);
+	return EXIT_SUCCESS;
+}
+
+/*thread does some work*/
+void do_work(int thi){
+	static int var3;
+
+	var3++;
+	if(!(var3 % 10000000))
+		printf("%s: thread %d did some work\n",progname, (thi) ); //(int)pthread_self() );
+}
+
+/*main function of the threads*/
+void *update_thread(void *i){
+	struct timespec req = {0};
+	int milisec = 1;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000L; //1us
+	int thid = (int)(i);
+
+	pthread_getschedparam( pthread_self(), &lpolicy, &lparam );
+	printf("%s: thread %d with priority: %d \n",
+			progname, (int)(i), (int)lparam.sched_priority );
+
+	while(1){
+		if(var1 != var2){
+			printf("%s: thread %d with priority: %d, var1 (%d) is not equal to var2 (%d)!\n",
+					progname, thid, (int)lparam.sched_priority, var1, var2);
+			var1 = var2;
+		}
+		do_work(thid);
+
+		var1++;
+		var2++;
+
+		//nanosleep(&req, (struct timespec *)NULL);
+	}
+	return (NULL);
+}
