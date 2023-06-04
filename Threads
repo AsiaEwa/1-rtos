@@ -1,0 +1,247 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sched.h>
+#include <time.h>
+#include <sys/resource.h>
+
+#define NumThreads 3
+
+int var1;
+int var2;
+
+/*main thread's function*/
+void *update_thread(void *i);
+void *update_thread1(void *i);
+void *update_thread2(void *i);
+
+
+char *progname = "threads";
+
+int main(void) {
+	pthread_t threadID[NumThreads]; /*array of threads id*/
+	pthread_attr_t attrib,attrib1,attrib2;          /*struct of thread's attributes*/
+	struct sched_param param,param1,param2;       /*struct of scheduling parameters*/
+	int policy;						/*scheduling policy*/
+	int oldcancel;
+	int i,error;
+
+
+	var1 = var2 = 0;
+
+	printf("%s: starting, creating theads ...\n", progname);
+	/*getting thread's parameters and scheduling policy*/
+	/*_________________________________________________*/
+	error=pthread_getschedparam( pthread_self(), &policy, &param );
+	if(error!=0){
+        printf("%s: failed to get priority\n", progname);
+    }
+
+    /*initializing structure of thread's attributes*/
+	/*_____________________________________________*/
+	error=pthread_attr_init(&attrib);
+    if(error!=0){
+        printf("%s: failed to init attribute \n", progname);
+    }
+    /*independent scheduling policy and priorities of threads */
+	/*_________________________________________________*/
+    pthread_attr_setinheritsched(&attrib, PTHREAD_EXPLICIT_SCHED);
+
+    /*setting a new scheduling policy - round-robin algorithm*/
+	/*_________________________________________________*/
+    error=pthread_attr_setschedpolicy(&attrib, SCHED_FIFO);
+    if(error!=0){
+        printf("failed to set sched policy\n");
+    }
+
+    param.sched_priority = 10;
+
+    /*set thread's attributes and scheduling policy*/
+	/*_________________________________________________*/
+    error=pthread_attr_setschedparam( &attrib, &param );
+    if(error!=0){
+        printf("failed to set priority\n");
+    }
+/*nowe struktury atrybutów wontków*/
+    /*initializing structure of thread's attributes*/
+	/*_____________________________________________*/
+	error=pthread_attr_init(&attrib1);
+    if(error!=0){
+        printf("%s: failed to init attribute \n", progname);
+    }
+    /*independent scheduling policy and priorities of threads */
+	/*_________________________________________________*/
+    pthread_attr_setinheritsched(&attrib1, PTHREAD_EXPLICIT_SCHED);
+
+    /*setting a new scheduling policy - round-robin algorithm*/
+	/*_________________________________________________*/
+   error=pthread_attr_setschedpolicy(&attrib1, SCHED_FIFO);
+    if(error!=0){
+        printf("failed to set sched policy\n");
+    }
+
+    param1.sched_priority = 15;
+
+    /*set thread's attributes and scheduling policy*/
+	/*_________________________________________________*/
+    error=pthread_attr_setschedparam( &attrib1, &param1 );
+    if(error!=0){
+        printf("failed to set priority\n");
+    }
+    /*druga struktura wątku 2*/
+    /*initializing structure of thread's attributes*/
+	/*_____________________________________________*/
+	error=pthread_attr_init(&attrib2);
+    if(error!=0){
+        printf("%s: failed to init attribute \n", progname);
+    }
+    /*independent scheduling policy and priorities of threads */
+	/*_________________________________________________*/
+    pthread_attr_setinheritsched(&attrib2, PTHREAD_EXPLICIT_SCHED);
+
+    /*setting a new scheduling policy - round-robin algorithm*/
+	/*_________________________________________________*/
+   error=pthread_attr_setschedpolicy(&attrib2, SCHED_OTHER);
+    if(error!=0){
+        printf("failed to set sched policy\n");
+    }
+
+    param2.sched_priority = 20;
+
+    /*set thread's attributes and scheduling policy*/
+	/*_________________________________________________*/
+    error=pthread_attr_setschedparam( &attrib2, &param2 );
+    if(error!=0){
+        printf("failed to set priority\n");
+    }
+    /*koniec atrybutów*/
+	pthread_setcanceltype( PTHREAD_CANCEL_ASYNCHRONOUS, &oldcancel );
+
+
+	for(i = 0; i < NumThreads; i++){
+		/*creating new threads, they start job in update_thread function*/
+		/*_________________________________________________*/
+    pthread_create( &threadID[i], &attrib, &update_thread, (void *)i);
+	}
+	i=0;
+	pthread_create( &threadID[i], &attrib, &update_thread, (void *)i);
+	i=1;
+	pthread_create( &threadID[i], &attrib1, &update_thread1, (void *)i);
+		i=2;
+	pthread_create( &threadID[i], &attrib2, &update_thread2, (void *)i);
+	/*wait some time, threads do their job */
+	sleep(120);
+
+	printf("%s: stopping, canceling threads ... \n", progname);
+
+	/*canceling threads*/
+
+	for(i = 0; i < NumThreads; i++){
+		/*_________________________________________________*/
+		pthread_cancel( threadID[i]);
+
+	}
+
+	printf("%s: all done, var1 = %d, var2 = %d\n", progname, var1, var2);
+	return EXIT_SUCCESS;
+}
+
+/*thread does some work*/
+void do_work(int thi){
+	static int var3;
+
+	var3++;
+	if(!(var3 % 10000000))
+		printf("%s: thread %d did some work\n",progname, (thi) ); //(int)pthread_self() );
+}
+
+/*main function of the threads*/
+void *update_thread(void *i){
+	struct timespec req = {0};
+	int milisec = 1;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000L; //1us
+	int thid = (int)(i);
+
+	pthread_getschedparam( pthread_self(), &lpolicy, &lparam );
+	printf("%s: thread %d with priority: %d \n",
+			progname, (int)(i), (int)lparam.sched_priority );
+
+	while(1){
+		if(var1 != var2){
+			printf("%s: thread %d with priority: %d, var1 (%d) is not equal to var2 (%d)!\n",
+					progname, thid, (int)lparam.sched_priority, var1, var2);
+			var1 = var2;
+		}
+		do_work(thid);
+
+		var1++;
+
+		var2++;
+
+		//nanosleep(&req, (struct timespec *)NULL);
+	}
+	return (NULL);
+}
+/*nowe funkcjex3*/
+void *update_thread1(void *i){
+	struct timespec req = {0};
+	int milisec = 1;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000L; //1us
+	int thid = (int)(i);
+
+	pthread_getschedparam( pthread_self(), &lpolicy, &lparam );
+	printf("%s: thread %d with priority: %d \n",
+			progname, (int)(i), (int)lparam.sched_priority );
+
+	while(1){
+		if(var1 != var2){
+			printf("%s: thread %d with priority: %d, var1 (%d) is not equal to var2 (%d)!\n",
+					progname, thid, (int)lparam.sched_priority, var1, var2);
+			var1 = var2;
+		}
+		do_work(thid);
+
+		var1--;
+
+		var2--;
+
+		//nanosleep(&req, (struct timespec *)NULL);
+	}
+	return (NULL);
+}
+void *update_thread2(void *i){
+	struct timespec req = {0};
+	int milisec = 1;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000L; //1us
+	int thid = (int)(i);
+
+	pthread_getschedparam( pthread_self(), &lpolicy, &lparam );
+	printf("%s: thread %d with priority: %d \n",
+			progname, (int)(i), (int)lparam.sched_priority );
+
+	while(1){
+		if(var1 != var2){
+			printf("%s: thread %d with priority: %d, var1 (%d) is not equal to var2 (%d)!\n",
+					progname, thid, (int)lparam.sched_priority, var1, var2);
+			var1 = var2;
+		}
+		do_work(thid);
+
+		var1+=2;
+
+		var2+=2;
+
+		//nanosleep(&req, (struct timespec *)NULL);
+	}
+	return (NULL);
+}
